@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             UrusanSeeder::class,
             InstansiSeeder::class,
+            UserSeeder::class,
         ]);
     }
 }
