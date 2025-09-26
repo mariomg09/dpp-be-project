@@ -24,4 +24,9 @@ class UserRepository extends BaseRepository implements UserRepositoryInterface
     {
         return $this->model->with('roles', 'department', 'urusan')->find($id);
     }
+
+    public function getByParams($params)
+    {
+        return $this->model->where($params['column'], $params['value'])->first();
+    }
 }

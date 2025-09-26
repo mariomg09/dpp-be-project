@@ -2,42 +2,48 @@
 
 namespace App\Services;
 
-use App\Actions\Users\CreateUserAction;
-use Tymon\JWTAuth\Facades\JWTAuth;
+use App\Actions\Auth\GetResponseTokenAction;
+use App\Actions\Auth\HashCheckAction;
+use App\Actions\Auth\UnauthorizedResponseAction;
+use App\Actions\Users\AddRoleAction;
+use App\Actions\Users\GetUserByParamsAction;
+use App\Contracts\UserRepositoryInterface;
+use App\DTOs\RegisterDTO;
 
 class AuthService
 {
-    public function __construct() {}
+    public function __construct(
+        protected AddRoleAction $addRole,
+        protected GetResponseTokenAction $getResponseToken,
+        protected GetUserByParamsAction $getUserByParams,
+        protected HashCheckAction $hashCheck,
+        protected UnauthorizedResponseAction $unauthorizedResponse,
+        protected UserRepositoryInterface $userRepository
+    ) {}
 
-    public function login(array $credentials)
+    public function login(array $credentials): array
     {
-        if (! $token = auth()->attempt($credentials)) {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
+        # get User by Params
+        $user    = $this->getUserByParams->execute('username', $credentials);
+        if (!$user) $this->unauthorizedResponse->execute();
 
-        return $this->respondWithToken($token);
+        # Check hash
+        $checked = $this->hashCheck->execute($user, $credentials);
+        if (!$checked) $this->unauthorizedResponse->execute();
+
+        # Attempt credential
+        if (!$token = auth()->attempt($credentials)) $this->unauthorizedResponse->execute();
+
+        return $this->getResponseToken->execute($token);
     }
-    protected function respondWithToken($token)
-    {
-        return response()->json([
-            'access_token' => $token,
-            'token_type' => 'bearer',
-            'expires_in' => JWTAuth::factory()->getTTL() * 60
-        ]);
-    }
 
-    public function register($request)
+    public function register(RegisterDTO $dto)
     {
-        try {
-            $user = app(CreateUserAction::class)->execute($request);
-            $token = \Tymon\JWTAuth\Facades\JWTAuth::fromUser($user);
-            return response()->json([
-                'message' => 'User successfully registered',
-                'user'    => $user,
-                'token'   => $token,
-            ], 201);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        $user = $this->userRepository->create($dto->toArray());
+
+        # Add role
+        $this->addRole->execute($dto->role, $user);
+
+        return $user;
     }
 }

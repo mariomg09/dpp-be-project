@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\DTOs\RegisterDTO;
+use App\Http\Requests\RegisterRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -10,21 +12,18 @@ use App\Services\AuthService;
 
 class RegisterController
 {
-    public function register(Request $request)
+    public function __construct(
+        protected AuthService $authService
+    ) {}
+
+    public function register(RegisterRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name'     => 'required|string|max:255',
-            'username' => 'required|string|unique:users,username',
-            'email'    => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6|confirmed', // expects password_confirmation
-        ]);
+        # Assign Register DTO
+        $dto    = new RegisterDTO(...$request->validated());
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
+        # Get Result
+        $result = $this->authService->register($dto);
 
-        $result = (new AuthService())->register($request);
-
-        return $result;
+        return response()->json($result);
     }
 }
